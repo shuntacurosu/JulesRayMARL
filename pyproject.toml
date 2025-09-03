@@ -1,0 +1,24 @@
+[project]
+name = "custom_rl_agent"
+version = "0.1.0"
+description = "A custom distributed reinforcement learning agent using Ray."
+authors = [{ name = "Jules", email = "jules@example.com" }]
+requires-python = ">=3.9"
+dependencies = [
+    "ray[rllib]",
+    "mlflow",
+    "gymnasium",
+    "pettingzoo",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
