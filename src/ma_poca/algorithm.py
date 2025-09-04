@@ -15,16 +15,11 @@ class MAPOCAConfig(PPOConfig):
         self.framework("torch")
         self.model = {
             "custom_model": MAPOCATorchModel,
-            "custom_model_config": {
-                "max_agents": 3,
-            },
+            "custom_model_config": {}, # Let user specify max_agents
             "fcnet_hiddens": [256, 256],
             "fcnet_activation": "relu",
             "max_seq_len": 20,
         }
-
-    def build(self, *args, **kwargs):
-        return super().build(*args, **kwargs)
 
 
 class MAPOCA(PPO):

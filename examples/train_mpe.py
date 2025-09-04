@@ -55,14 +55,15 @@ def main():
         .debugging(log_level="INFO")
     )
 
-    # Set PPO-specific training parameters that are not in the main .training() block
+    # In this version of RLlib, some PPO-specific parameters must be set as direct
+    # attributes on the config object, not inside the .training() method.
     config.sgd_minibatch_size = 128
     config.num_sgd_iter = 10
     config.normalize_advantages = True
     config.grad_clip = 40.0
 
     # Update the custom model config
-    config.model["custom_model_config"]["max_agents"] = 3
+    config.model["custom_model_config"]["max_agents"] = len(agent_ids)
 
     # Set up MLflow tracking.
     mlflow.set_tracking_uri("file:./mlruns")

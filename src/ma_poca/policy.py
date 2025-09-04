@@ -48,18 +48,17 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
         )
         nn.Module.__init__(self)
 
-        actor_input_dim = 18
-        critic_attention_input_dim = 18
+        obs_dim = obs_space.shape[0]
 
         self.actor_net = nn.Sequential(
-            nn.Linear(actor_input_dim, 256),
+            nn.Linear(obs_dim, 256),
             nn.ReLU(),
             nn.Linear(256, 256),
             nn.ReLU(),
         )
         self.action_branch = nn.Linear(256, num_outputs)
 
-        self.attention_layer = SelfAttention(input_dim=critic_attention_input_dim, d_model=128)
+        self.attention_layer = SelfAttention(input_dim=obs_dim, d_model=128)
 
         self.critic_net = nn.Sequential(
             nn.Linear(128, 256),
@@ -71,26 +70,20 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
 
     def forward(self, input_dict: Dict, state: List[TensorType], seq_lens: TensorType):
         obs_tensor = flatten_inputs_to_1d_tensor(input_dict[SampleBatch.OBS], self.obs_space)
-        local_obs_tensor = obs_tensor[:, :18]
-        actor_features = self.actor_net(local_obs_tensor)
+        actor_features = self.actor_net(obs_tensor)
         action_logits = self.action_branch(actor_features)
 
         if "critic_obs" in input_dict:
             critic_obs = input_dict["critic_obs"]
             critic_mask = input_dict["critic_obs_mask"]
+
+            attention_out = self.attention_layer(critic_obs, mask=critic_mask)
+            my_attention_out = attention_out[:, 0, :]
+            self._value_out = self.critic_net(my_attention_out).squeeze(-1)
         else:
             batch_size = obs_tensor.shape[0]
-            max_agents = self.model_config["custom_model_config"]["max_agents"]
-            obs_dim = 18
             device = obs_tensor.device
-            critic_obs = torch.zeros(batch_size, max_agents, obs_dim, device=device)
-            critic_mask = torch.ones(batch_size, max_agents, dtype=torch.bool, device=device)
-            critic_mask[:, 0] = False
-
-        attention_out = self.attention_layer(critic_obs, mask=critic_mask)
-        my_attention_out = attention_out[:, 0, :]
-
-        self._value_out = self.critic_net(my_attention_out).squeeze(-1)
+            self._value_out = torch.zeros(batch_size, device=device)
 
         return action_logits, state
 
@@ -100,27 +93,22 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
 
 def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episode=None):
     if not policy.loss_initialized():
-        obs_dim = 18
+        obs_dim = policy.observation_space.shape[0]
         max_agents = policy.config["model"]["custom_model_config"]["max_agents"]
         sample_batch["critic_obs"] = torch.zeros(len(sample_batch), max_agents, obs_dim).float().to(policy.device)
         sample_batch["critic_obs_mask"] = torch.ones(len(sample_batch), max_agents).bool().to(policy.device)
-        sample_batch["critic_obs_mask"][:, 0] = False # Avoid NaNs
+        sample_batch["critic_obs_mask"][:, 0] = False
         return sample_batch
 
     max_agents = policy.config["model"]["custom_model_config"]["max_agents"]
     obs_dim = policy.observation_space.shape[0]
 
-    # In single worker mode, all data is in `sample_batch`.
-    # We need to group it by timestep to build the centralized observation.
     if other_agent_batches is None:
         obs_by_timestep = defaultdict(list)
-        # Use a unique identifier for each sample to handle multiple episodes in one batch
-        sample_batch["unique_id"] = np.arange(len(sample_batch))
-
         for i in range(len(sample_batch)):
             eps_id = sample_batch[SampleBatch.EPS_ID][i]
             t = sample_batch[SampleBatch.T][i]
-            obs_by_timestep[(eps_id, t)].append(sample_batch[SampleBatch.OBS][i])
+            obs_by_timestep[(eps_id, t)].append((sample_batch[SampleBatch.OBS][i], i))
 
         critic_obs_list, critic_mask_list = [], []
         for i in range(len(sample_batch)):
@@ -128,22 +116,20 @@ def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episo
             t = sample_batch[SampleBatch.T][i]
             my_obs = sample_batch[SampleBatch.OBS][i]
 
-            # Get all observations at this specific timestep
-            all_obs_at_ts = obs_by_timestep.get((eps_id, t), [])
+            all_obs_with_indices = obs_by_timestep.get((eps_id, t), [])
 
             padded_obs = np.zeros((max_agents, obs_dim), dtype=np.float32)
             mask = np.ones(max_agents, dtype=bool)
 
-            # Place current agent's observation at the first position
             padded_obs[0] = my_obs
-
-            # Fill the rest with other agents' observations
-            other_obs = [obs for obs in all_obs_at_ts if not np.array_equal(obs, my_obs)]
+            other_obs = [obs for obs, index in all_obs_with_indices if index != i]
             num_others = len(other_obs)
-            if num_others > 0:
-                padded_obs[1:1+num_others] = np.array(other_obs)
 
-            num_filled = 1 + num_others
+            if num_others > 0:
+                num_to_fill = min(num_others, max_agents - 1)
+                padded_obs[1:1+num_to_fill] = np.array(other_obs[:num_to_fill])
+
+            num_filled = 1 + min(num_others, max_agents - 1)
             mask[:num_filled] = False
 
             critic_obs_list.append(padded_obs)
@@ -152,8 +138,9 @@ def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episo
         sample_batch["critic_obs"] = torch.from_numpy(np.array(critic_obs_list)).float().to(policy.device)
         sample_batch["critic_obs_mask"] = torch.from_numpy(np.array(critic_mask_list)).bool().to(policy.device)
     else:
-        # Multi-worker logic would be needed here. For this example, we assume single worker.
-        pass
+        raise NotImplementedError(
+            "MA-POCA multi-worker postprocessing is not implemented in this example."
+        )
 
     return sample_batch
 
