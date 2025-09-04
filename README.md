@@ -1,37 +1,47 @@
-# Custom Reinforcement Learning Agent
+# MA-POCA Implementation for RLlib
 
-This project is a customized distributed reinforcement learning agent built using [Ray](https://www.ray.io/). It is designed to implement various algorithms and distributed architectures, with the ultimate goal of implementing advanced multi-agent algorithms like Agent57.
+This project provides an implementation of the **MA-POCA (Multi-Agent Posthumous Credit Assignment)** algorithm, designed to work within the Ray RLlib framework. The implementation is based on the original paper and is demonstrated on a multi-agent environment from the PettingZoo library.
 
 ## Core Technologies
 
--   [Ray](https://www.ray.io/): For distributed computing.
+-   [Ray (RLlib)](https://www.ray.io/): For distributed reinforcement learning.
+-   [PyTorch](https://pytorch.org/): As the deep learning backend.
 -   [MLFlow](https://mlflow.org/): For experiment tracking.
--   [Gymnasium](https://gymnasium.farama.org/): As the environment API.
 -   [PettingZoo](https://pettingzoo.farama.org/): For multi-agent environments.
 
 ## Project Structure
 
 -   `.github/`: Contains GitHub Actions workflows and templates.
--   `docs/`: Contains project documentation (specifications, design docs).
--   `src/`: Contains the source code for the RL agent.
+-   `docs/`: Contains project documentation.
+-   `src/ma_poca/`: Contains the source code for the MA-POCA algorithm, including the custom policy and model with a self-attention critic.
+-   `examples/`: Contains an example script to train the MA-POCA agent on a PettingZoo environment.
 -   `tests/`: Contains tests for the project.
 
 ## Development
 
-This project follows a Test-Driven Development (TDD) approach. All code changes must be accompanied by corresponding tests.
-
 ### Setup
 
-To set up the development environment, install the project in editable mode with the development dependencies:
+To set up the development environment, install the project in editable mode. This will also install all the required dependencies from `pyproject.toml`.
 
+```bash
+pip install -e .
+```
+
+To install development dependencies (like `pytest`), run:
 ```bash
 pip install -e .[dev]
 ```
 
-### Running Tests
+### Usage
 
-To run the test suite:
+To run the example training script for MA-POCA on the `simple_spread_v3` environment:
 
 ```bash
-pytest
+python -m examples.train_mpe
+```
+
+This will start the training process. Metrics and results will be logged to the console and also saved to an `mlruns` directory, which can be viewed with the MLflow UI:
+
+```bash
+mlflow ui
 ```
