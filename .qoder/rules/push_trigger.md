@@ -1,5 +1,6 @@
 ---
-trigger: pre_commit
+trigger: manual
+alwaysApply: false
 ---
 
 # Push Trigger Rules

@@ -64,7 +64,9 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
         )
         self.action_branch = nn.Linear(256, num_outputs)
 
-        self.attention_layer = SelfAttention(input_dim=18, d_model=128)  # 入力次元を18に変更
+        self.attention_layer = SelfAttention(
+            input_dim=18, d_model=128
+        )  # 入力次元を18に変更
 
         self.critic_net = nn.Sequential(
             nn.Linear(128, 256), nn.ReLU(), nn.Linear(256, 1)
