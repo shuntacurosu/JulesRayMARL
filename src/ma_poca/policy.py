@@ -1,18 +1,19 @@
-import torch
-import torch.nn as nn
-import numpy as np
-import ray
-from gymnasium.spaces import Box, Dict
 from collections import defaultdict
 
-from ray.rllib.utils.torch_utils import flatten_inputs_to_1d_tensor
+import numpy as np
+import torch
+import torch.nn as nn
+from gymnasium.spaces import Box, Dict
+from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.policy.sample_batch import SampleBatch
-from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
-from ray.rllib.utils.typing import TensorType, List, ModelConfigDict
+from ray.rllib.utils.torch_utils import flatten_inputs_to_1d_tensor
+from ray.rllib.utils.typing import List, ModelConfigDict, TensorType
+
 
 class SelfAttention(nn.Module):
     """A simple self-attention module."""
+
     def __init__(self, input_dim, d_model=128, n_heads=4):
         super().__init__()
         self.input_dim = input_dim
@@ -33,8 +34,10 @@ class SelfAttention(nn.Module):
         attn_output, _ = self.mha(q, k, v, key_padding_mask=mask)
         return attn_output
 
+
 class MAPOCATorchModel(TorchModelV2, nn.Module):
     """MA-POCA model with a self-attention based centralized critic."""
+
     def __init__(
         self,
         obs_space: Box,
@@ -61,15 +64,15 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
         self.attention_layer = SelfAttention(input_dim=obs_dim, d_model=128)
 
         self.critic_net = nn.Sequential(
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.Linear(128, 256), nn.ReLU(), nn.Linear(256, 1)
         )
 
         self._value_out = None
 
     def forward(self, input_dict: Dict, state: List[TensorType], seq_lens: TensorType):
-        obs_tensor = flatten_inputs_to_1d_tensor(input_dict[SampleBatch.OBS], self.obs_space)
+        obs_tensor = flatten_inputs_to_1d_tensor(
+            input_dict[SampleBatch.OBS], self.obs_space
+        )
         actor_features = self.actor_net(obs_tensor)
         action_logits = self.action_branch(actor_features)
 
@@ -91,12 +94,27 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
         assert self._value_out is not None, "must call forward() first"
         return self._value_out
 
-def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episode=None):
+
+def ma_poca_postprocessing(
+    policy, sample_batch, other_agent_batches=None, episode=None
+):
+    # Initialize vf_preds if not present
+    if SampleBatch.VF_PREDS not in sample_batch:
+        sample_batch[SampleBatch.VF_PREDS] = np.zeros_like(
+            sample_batch[SampleBatch.REWARDS], dtype=np.float32
+        )
+
     if not policy.loss_initialized():
         obs_dim = policy.observation_space.shape[0]
         max_agents = policy.config["model"]["custom_model_config"]["max_agents"]
-        sample_batch["critic_obs"] = torch.zeros(len(sample_batch), max_agents, obs_dim).float().to(policy.device)
-        sample_batch["critic_obs_mask"] = torch.ones(len(sample_batch), max_agents).bool().to(policy.device)
+        sample_batch["critic_obs"] = (
+            torch.zeros(len(sample_batch), max_agents, obs_dim)
+            .float()
+            .to(policy.device)
+        )
+        sample_batch["critic_obs_mask"] = (
+            torch.ones(len(sample_batch), max_agents).bool().to(policy.device)
+        )
         sample_batch["critic_obs_mask"][:, 0] = False
         return sample_batch
 
@@ -127,7 +145,7 @@ def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episo
 
             if num_others > 0:
                 num_to_fill = min(num_others, max_agents - 1)
-                padded_obs[1:1+num_to_fill] = np.array(other_obs[:num_to_fill])
+                padded_obs[1 : 1 + num_to_fill] = np.array(other_obs[:num_to_fill])
 
             num_filled = 1 + min(num_others, max_agents - 1)
             mask[:num_filled] = False
@@ -135,8 +153,12 @@ def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episo
             critic_obs_list.append(padded_obs)
             critic_mask_list.append(mask)
 
-        sample_batch["critic_obs"] = torch.from_numpy(np.array(critic_obs_list)).float().to(policy.device)
-        sample_batch["critic_obs_mask"] = torch.from_numpy(np.array(critic_mask_list)).bool().to(policy.device)
+        sample_batch["critic_obs"] = (
+            torch.from_numpy(np.array(critic_obs_list)).float().to(policy.device)
+        )
+        sample_batch["critic_obs_mask"] = (
+            torch.from_numpy(np.array(critic_mask_list)).bool().to(policy.device)
+        )
     else:
         raise NotImplementedError(
             "MA-POCA multi-worker postprocessing is not implemented in this example."
@@ -144,14 +166,20 @@ def ma_poca_postprocessing(policy, sample_batch, other_agent_batches=None, episo
 
     return sample_batch
 
+
 class MAPOCAPolicy(PPOTorchPolicy):
     def __init__(self, observation_space, action_space, config):
         super().__init__(observation_space, action_space, config)
         from ray.rllib.algorithms.ppo.ppo_torch_policy import ValueNetworkMixin
+
         ValueNetworkMixin.__init__(self, config)
 
     def postprocess_trajectory(
         self, sample_batch, other_agent_batches=None, episode=None
     ):
-        batch_with_critic_obs = ma_poca_postprocessing(self, sample_batch, other_agent_batches, episode)
-        return super().postprocess_trajectory(batch_with_critic_obs, other_agent_batches, episode)
+        batch_with_critic_obs = ma_poca_postprocessing(
+            self, sample_batch, other_agent_batches, episode
+        )
+        return super().postprocess_trajectory(
+            batch_with_critic_obs, other_agent_batches, episode
+        )
