@@ -8,7 +8,7 @@ from ray import tune
 from ray.rllib.env.wrappers.pettingzoo_env import PettingZooEnv
 from ray.tune.schedulers import ASHAScheduler
 
-from src.ma_poca.algorithm import MAPOCAConfig
+from ma_poca.algorithm import MAPOCAConfig
 
 
 def create_env(config):

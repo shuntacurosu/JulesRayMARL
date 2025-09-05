@@ -1,7 +1,7 @@
 from ray.rllib.algorithms.ppo import PPO, PPOConfig
 from ray.rllib.policy.policy import Policy
 
-from src.ma_poca.policy import MAPOCAPolicy, MAPOCATorchModel
+from ma_poca.policy import MAPOCAPolicy, MAPOCATorchModel
 
 
 class MAPOCAConfig(PPOConfig):

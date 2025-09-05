@@ -14,7 +14,7 @@ This project provides an implementation of the **MA-POCA (Multi-Agent Posthumous
 -   `.github/`: Contains GitHub Actions workflows and templates.
 -   `docs/`: Contains project documentation.
 -   `src/ma_poca/`: Contains the source code for the MA-POCA algorithm, including the custom policy and model with a self-attention critic.
--   `examples/`: Contains an example script to train the MA-POCA agent on a PettingZoo environment.
+-   `examples/`: Contains example scripts to train the MA-POCA agent on PettingZoo environments.
 -   `tests/`: Contains tests for the project.
 
 ## Development
@@ -59,7 +59,13 @@ To run the example training script for MA-POCA on the `simple_spread_v3` environ
 python -m examples.train_mpe
 ```
 
-This will start the training process. Metrics and results will be logged to the console and also saved to an `mlruns` directory, which can be viewed with the MLflow UI:
+To run the hyperparameter tuning example:
+
+```bash
+python -m examples.hpo_mpe
+```
+
+These will start the training process. Metrics and results will be logged to the console and also saved to an `mlruns` directory, which can be viewed with the MLflow UI:
 
 ```bash
 mlflow ui
