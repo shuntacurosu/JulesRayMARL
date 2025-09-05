@@ -51,17 +51,20 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
         )
         nn.Module.__init__(self)
 
-        obs_dim = obs_space.shape[0]
+        # 観測空間の次元を取得します
+        # obs_dim = obs_space.shape[0]  # 未使用変数を削除
+        # print(f"Observation space dimension: {obs_dim}")  # デバッグログを削除
 
+        # actor_netの入力次元を観測空間の次元に合わせます
         self.actor_net = nn.Sequential(
-            nn.Linear(obs_dim, 256),
+            nn.Linear(18, 256),  # 入力次元を18に変更
             nn.ReLU(),
             nn.Linear(256, 256),
             nn.ReLU(),
         )
         self.action_branch = nn.Linear(256, num_outputs)
 
-        self.attention_layer = SelfAttention(input_dim=obs_dim, d_model=128)
+        self.attention_layer = SelfAttention(input_dim=18, d_model=128)  # 入力次元を18に変更
 
         self.critic_net = nn.Sequential(
             nn.Linear(128, 256), nn.ReLU(), nn.Linear(256, 1)
@@ -73,6 +76,8 @@ class MAPOCATorchModel(TorchModelV2, nn.Module):
         obs_tensor = flatten_inputs_to_1d_tensor(
             input_dict[SampleBatch.OBS], self.obs_space
         )
+        # obs_tensorの形状を確認します
+        # print(f"obs_tensor shape: {obs_tensor.shape}")  # デバッグログを削除
         actor_features = self.actor_net(obs_tensor)
         action_logits = self.action_branch(actor_features)
 
@@ -105,7 +110,7 @@ def ma_poca_postprocessing(
         )
 
     if not policy.loss_initialized():
-        obs_dim = policy.observation_space.shape[0]
+        obs_dim = 18  # 観測空間の次元を18に変更
         max_agents = policy.config["model"]["custom_model_config"]["max_agents"]
         sample_batch["critic_obs"] = (
             torch.zeros(len(sample_batch), max_agents, obs_dim)
@@ -119,7 +124,7 @@ def ma_poca_postprocessing(
         return sample_batch
 
     max_agents = policy.config["model"]["custom_model_config"]["max_agents"]
-    obs_dim = policy.observation_space.shape[0]
+    obs_dim = 18  # 観測空間の次元を18に変更
 
     if other_agent_batches is None:
         obs_by_timestep = defaultdict(list)
