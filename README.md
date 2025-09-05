@@ -21,9 +21,10 @@ This project provides an implementation of the **MA-POCA (Multi-Agent Posthumous
 
 ### Setup
 
-To set up the development environment, install the project in editable mode. This will also install all the required dependencies from `pyproject.toml`.
+To set up the development environment, first activate the conda environment and then install the project in editable mode. This will also install all the required dependencies from `pyproject.toml`.
 
 ```bash
+conda activate JulesRayMARL
 pip install -e .
 ```
 
